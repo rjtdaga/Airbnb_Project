@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface TravelFormProps {
-  onSubmit: (data: { query: string; email: string; name: string }) => void;
+  onSubmit: (data: { query: string; email: string; name: string; priceTracking?: boolean; frequency?: string }) => void;
   isLoading: boolean;
   exampleQueries: Array<{ text: string; dates: string }>;
 }
@@ -13,7 +13,9 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
   const [formData, setFormData] = useState({
     query: '',
     email: '',
-    name: ''
+    name: '',
+    priceTracking: false,
+    frequency: 'weekly'
   });
 
   const [errors, setErrors] = useState({
@@ -55,11 +57,13 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     
-    if (errors[field as keyof typeof errors]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+    if (field === 'query' || field === 'email' || field === 'name') {
+      if (errors[field as keyof typeof errors]) {
+        setErrors(prev => ({ ...prev, [field]: '' }));
+      }
     }
   };
 
@@ -131,6 +135,36 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
           />
           {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
         </div>
+      </div>
+
+      <div className="mt-2">
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={formData.priceTracking}
+            onChange={(e) => handleInputChange('priceTracking', e.target.checked)}
+            disabled={isLoading}
+            className="w-4 h-4"
+          />
+          <span className="text-sm text-gray-700">Enable price tracking (receive price updates)</span>
+        </label>
+
+        {formData.priceTracking && (
+          <div className="mt-3">
+            <label htmlFor="frequency" className="block text-sm font-medium text-gray-700 mb-2">Delivery frequency</label>
+            <select
+              id="frequency"
+              value={formData.frequency}
+              onChange={(e) => handleInputChange('frequency', e.target.value)}
+              disabled={isLoading}
+              className="w-full p-3 rounded-xl border border-gray-300 focus:border-red-500 focus:ring-2 focus:ring-red-200 bg-white text-gray-900"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <Button
