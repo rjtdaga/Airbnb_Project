@@ -79,9 +79,9 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Here is a user query about Airbnb stays: {{ $json.query.query }}\n\n### \nPlease add a detailed description of the listing in the output. If the person has asked for a country, please mention that in the query and return the listing for a major city. If the price points seems too low or too high, please use the best of your judgement.\n\nAlways request and display prices in USD currency when searching Airbnb listings",
+        "text": "=User query: {{ $json.query.query }}\n\nPlease ensure the agent adheres to the following:\n- If key parameters (dates, number of guests, or budget) are missing, ask a concise follow-up question instead of guessing.\n- If the user specified only a country, return results for a major city in that country and note the city chosen.\n- For each listing include: title, direct link, neighborhood/city, property type, standout features, guest rating and review count, total price in USD, cancellation policy, booking urgency, and a brief reason why it matches the query.\n- Flag prices that look unusually low or high and provide a short assessment.\n- Always show prices in USD and note any currency conversions performed.\n\nIf no listings are found, respond exactly: \"Unfortunately we couldn't find listings that match your request.\"",
         "options": {
-          "systemMessage": "=You're a helpful assistant.\n\n– Use the Airbnb MCP Tool to pull data from the Airbnb website in USD.\n\nStart by running listTools to see the available tools, then use executeTool to run the one that fits your task\n\nCurrent date and time {{ $now }}"
+          "systemMessage": "=You are an assistant specialized in finding Airbnb listings. Follow these rules:\n\n1) Always run listTools and select the official Airbnb MCP tool before executing searches.\n2) Ensure all prices are returned in USD; if the MCP returns another currency, convert to USD and state the conversion rate and source.\n3) If required search parameters (dates, guests) are missing, ask a clarifying question rather than assuming values.\n4) Do not request or expose PII beyond the user's email required for delivery. Respect privacy and legal scraping constraints.\n5) If the MCP tool fails or returns no results, provide a helpful fallback and suggest alternative search criteria.\n\nCurrent date and time: {{ $now }}"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -173,7 +173,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=You need to rewrite below in to a specific format, make sure you output all examples Please add as much detail as possible from the descriptions:  {{ $json.output }}\n\nMake sure your reasoning is top notch and as DETAILED as possible. Please make sure all the outputs are present, if the answer isn't available, please guess\n\nIf there is no listing, say Unfortunately we couldn't find listings that you were looking for",
+        "text": "=Rewrite the following into the structured output format exactly as specified. Include all required fields and examples: {{ $json.output }}\n\nBe as detailed as possible but do not fabricate information. If a field is unknown or missing, set it to \"Unknown\" and note which data is unavailable.\n\nIf there are no listings, reply exactly: \"Unfortunately we couldn't find listings that match your request.\"",
         "hasOutputParser": true,
         "batching": {}
       },

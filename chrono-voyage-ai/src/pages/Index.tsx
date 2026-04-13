@@ -18,7 +18,7 @@ const Index = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
 
-  const handleFormSubmit = async (data: { query: string; email: string; name: string }) => {
+  const handleFormSubmit = async (data: { query: string; email: string; name: string; priceTracking?: boolean; frequency?: string }) => {
     setIsLoading(true);
     
     try {
@@ -26,6 +26,13 @@ const Index = () => {
       webhookUrl.searchParams.append('query', data.query);
       webhookUrl.searchParams.append('email', data.email);
       webhookUrl.searchParams.append('name', data.name);
+      // Append price-tracking preferences when provided
+      if (data.priceTracking) {
+        webhookUrl.searchParams.append('priceTracking', 'true');
+        webhookUrl.searchParams.append('frequency', data.frequency || 'weekly');
+      } else {
+        webhookUrl.searchParams.append('priceTracking', 'false');
+      }
 
       console.log('Sending request to:', webhookUrl.toString());
       
@@ -40,7 +47,7 @@ const Index = () => {
         setIsSubmitted(true);
         toast({
           title: "🏠 Search Submitted Successfully!",
-          description: "We're finding the perfect Airbnb listings for you. Check your email shortly!",
+          description: "We're finding the perfect Airbnb listings for you. Check your email shortly! If price tracking was enabled, you'll receive updates per your selected frequency.",
           className: "border-red-500 bg-white text-gray-900",
         });
       } else {
