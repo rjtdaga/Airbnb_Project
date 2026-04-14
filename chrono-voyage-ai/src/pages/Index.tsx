@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -18,15 +17,24 @@ const Index = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
 
-  const handleFormSubmit = async (data: { query: string; email: string; name: string; priceTracking?: boolean; frequency?: string }) => {
+  const handleFormSubmit = async (data: {
+    query: string;
+    email: string;
+    name: string;
+    priceTracking?: boolean;
+    frequency?: string;
+    budgetMin?: number;
+    budgetMax?: number;
+  }) => {
     setIsLoading(true);
-    
+
     try {
       const webhookUrl = new URL('https://n8n.srv874091.hstgr.cloud/webhook/2586fd7a-0113-4719-8038-9b59cbcea6e0');
       webhookUrl.searchParams.append('query', data.query);
       webhookUrl.searchParams.append('email', data.email);
       webhookUrl.searchParams.append('name', data.name);
-      // Append price-tracking preferences when provided
+
+      // Price tracking
       if (data.priceTracking) {
         webhookUrl.searchParams.append('priceTracking', 'true');
         webhookUrl.searchParams.append('frequency', data.frequency || 'weekly');
@@ -34,8 +42,14 @@ const Index = () => {
         webhookUrl.searchParams.append('priceTracking', 'false');
       }
 
+      // Budget
+      if (data.budgetMin !== undefined && data.budgetMax !== undefined) {
+        webhookUrl.searchParams.append('budgetMin', String(data.budgetMin));
+        webhookUrl.searchParams.append('budgetMax', String(data.budgetMax));
+      }
+
       console.log('Sending request to:', webhookUrl.toString());
-      
+
       const response = await fetch(webhookUrl.toString(), {
         method: 'GET',
         headers: {
@@ -47,7 +61,9 @@ const Index = () => {
         setIsSubmitted(true);
         toast({
           title: "🏠 Search Submitted Successfully!",
-          description: "We're finding the perfect Airbnb listings for you. Check your email shortly! If price tracking was enabled, you'll receive updates per your selected frequency.",
+          description: "We're finding the perfect Airbnb listings for you. Check your email shortly!" +
+            (data.priceTracking ? " Price tracking has been enabled." : "") +
+            (data.budgetMin !== undefined ? ` Budget filter: $${data.budgetMin}–$${data.budgetMax} USD.` : ""),
           className: "border-red-500 bg-white text-gray-900",
         });
       } else {
@@ -72,7 +88,7 @@ const Index = () => {
       dates: "21st July to 23rd July 2025"
     },
     {
-      text: "Modern apartment in Tokyo near train stations", 
+      text: "Modern apartment in Tokyo near train stations",
       dates: "15th August to 18th August 2025"
     },
     {
@@ -82,8 +98,6 @@ const Index = () => {
   ];
 
   const handleExampleSelect = (example: typeof exampleQueries[0]) => {
-    const fullQuery = `${example.text} from ${example.dates}`;
-    // Dispatch a custom event to communicate with TravelForm
     window.dispatchEvent(new CustomEvent('exampleSelected', { detail: example }));
   };
 
@@ -124,12 +138,12 @@ const Index = () => {
                 <h2 className="text-2xl font-semibold text-gray-900 mb-4">
                   Describe your perfect stay
                 </h2>
-                
+
                 {/* Example Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="mb-6 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
                     >
                       Try an example
@@ -169,10 +183,17 @@ const Index = () => {
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Search Submitted!</h2>
-              <p className="text-gray-600 text-lg">
-                We're searching through thousands of Airbnb properties to find your perfect match. 
+              <p className="text-gray-600 text-lg mb-6">
+                We're searching through thousands of Airbnb properties to find your perfect match.
                 Check your email shortly for results.
               </p>
+              <Button
+                onClick={() => setIsSubmitted(false)}
+                variant="outline"
+                className="border-red-300 text-red-500 hover:bg-red-50"
+              >
+                🔍 Search Again
+              </Button>
             </Card>
           )}
         </div>
@@ -192,7 +213,6 @@ const Index = () => {
         </div>
       </footer>
 
-      {/* Loading Overlay */}
       {isLoading && <LoadingSpinner />}
     </div>
   );
