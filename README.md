@@ -24,5 +24,5 @@ This workflow automates the process of searching Airbnb listings based on user q
 
 ---
 
-## 📚 References
+## References
 - Adapted and Developed form: Agents in Action Course (https://traversaal-ai.github.io/agents-in-action/)
