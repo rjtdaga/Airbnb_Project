@@ -1,0 +1,269 @@
+{
+  "name": "Airbnb Price Tracking - Subscribe & Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "airbnb-subscribe",
+        "options": { "responseMode": "responseNode" }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "name": "Subscribe Webhook",
+      "webhookId": "airbnb-subscribe-hook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "name": "email", "value": "={{ $query.email }}", "type": "string" },
+            { "name": "name", "value": "={{ $query.name }}", "type": "string" },
+            { "name": "query", "value": "={{ $query.query }}", "type": "string" },
+            { "name": "frequency", "value": "={{ $query.frequency || 'weekly' }}", "type": "string" },
+            { "name": "createdAt", "value": "={{ new Date().toISOString() }}", "type": "string" }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300],
+      "name": "Build Subscription Record"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID_HERE" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Subscriptions" },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 300],
+      "name": "Save to Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "✅ Price Tracking Enabled for Your Airbnb Search",
+        "emailType": "html",
+        "message": "=<div style='font-family:sans-serif;max-width:600px;margin:0 auto;'><div style='background:#FF5A5F;padding:24px;border-radius:12px 12px 0 0;'><h1 style='color:white;margin:0;font-size:24px;'>🏠 Airbnb Price Tracking</h1></div><div style='padding:24px;border:1px solid #eee;border-radius:0 0 12px 12px;'><p style='font-size:16px;color:#333;'>Hi <strong>{{ $json.name }}</strong>,</p><p style='color:#555;'>You've successfully subscribed to price tracking for:</p><div style='background:#f9f9f9;border-left:4px solid #FF5A5F;padding:12px 16px;border-radius:4px;margin:16px 0;'><p style='margin:0;color:#333;font-style:italic;'>\"{{ $json.query }}\"</p></div><p style='color:#555;'>You'll receive <strong>{{ $json.frequency }}</strong> price updates to this email.</p><p style='color:#888;font-size:14px;margin-top:24px;'>To unsubscribe anytime, visit the app and click \"Unsubscribe from price tracking\".</p></div></div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [900, 300],
+      "name": "Send Confirmation Email",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"subscribed\", \"message\": \"Subscription confirmed\" }"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300],
+      "name": "Respond OK (Subscribe)"
+    },
+    {
+      "parameters": {
+        "path": "airbnb-unsubscribe",
+        "options": { "responseMode": "responseNode" }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 600],
+      "name": "Unsubscribe Webhook",
+      "webhookId": "airbnb-unsubscribe-hook"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID_HERE" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Subscriptions" },
+        "filters": {
+          "conditions": [
+            {
+              "leftValue": "email",
+              "condition": "equals",
+              "rightValue": "={{ $query.email }}"
+            },
+            {
+              "leftValue": "query",
+              "condition": "equals",
+              "rightValue": "={{ $query.query }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 600],
+      "name": "Delete from Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $query.email }}",
+        "subject": "👋 You've been unsubscribed from Airbnb Price Tracking",
+        "emailType": "html",
+        "message": "=<div style='font-family:sans-serif;max-width:600px;margin:0 auto;'><div style='background:#FF5A5F;padding:24px;border-radius:12px 12px 0 0;'><h1 style='color:white;margin:0;font-size:24px;'>🏠 Airbnb Price Tracking</h1></div><div style='padding:24px;border:1px solid #eee;border-radius:0 0 12px 12px;'><p style='color:#333;font-size:16px;'>You have been successfully unsubscribed from price tracking.</p><p style='color:#555;'>You will no longer receive price update emails for your saved search.</p><p style='color:#888;font-size:14px;margin-top:24px;'>Changed your mind? You can re-subscribe anytime from the app.</p></div></div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [680, 600],
+      "name": "Send Unsubscribe Confirmation",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"unsubscribed\", \"message\": \"Successfully unsubscribed\" }"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 600],
+      "name": "Respond OK (Unsubscribe)"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 1 }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 900],
+      "name": "Hourly Scheduler"
+    },
+    {
+      "parameters": {
+        "operation": "readAllRows",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID_HERE" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Subscriptions" },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 900],
+      "name": "Read All Subscriptions",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ (() => { const freq = $json.frequency; const now = new Date(); const created = new Date($json.lastSent || $json.createdAt); const diffHours = (now - created) / 3600000; if (freq === 'daily') return diffHours >= 24; if (freq === 'weekly') return diffHours >= 168; if (freq === 'monthly') return diffHours >= 720; return false; })() }}",
+              "condition": "equals",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [680, 900],
+      "name": "Filter Due Subscriptions"
+    },
+    {
+      "parameters": {
+        "url": "=https://n8n.srv874091.hstgr.cloud/webhook/2586fd7a-0113-4719-8038-9b59cbcea6e0",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "query", "value": "={{ $json.query }}" },
+            { "name": "email", "value": "={{ $json.email }}" },
+            { "name": "name", "value": "={{ $json.name }}" },
+            { "name": "priceTracking", "value": "true" },
+            { "name": "frequency", "value": "={{ $json.frequency }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 900],
+      "name": "Trigger Search for Subscriber"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID_HERE" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Subscriptions" },
+        "filters": {
+          "conditions": [
+            { "leftValue": "email", "condition": "equals", "rightValue": "={{ $json.email }}" },
+            { "leftValue": "query", "condition": "equals", "rightValue": "={{ $json.query }}" }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lastSent": "={{ new Date().toISOString() }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 900],
+      "name": "Update lastSent Timestamp",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CRED_ID",
+          "name": "Google Sheets"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Subscribe Webhook": { "main": [[{ "node": "Build Subscription Record", "type": "main", "index": 0 }]] },
+    "Build Subscription Record": { "main": [[{ "node": "Save to Google Sheets", "type": "main", "index": 0 }]] },
+    "Save to Google Sheets": { "main": [[{ "node": "Send Confirmation Email", "type": "main", "index": 0 }]] },
+    "Send Confirmation Email": { "main": [[{ "node": "Respond OK (Subscribe)", "type": "main", "index": 0 }]] },
+    "Unsubscribe Webhook": { "main": [[{ "node": "Delete from Google Sheets", "type": "main", "index": 0 }]] },
+    "Delete from Google Sheets": { "main": [[{ "node": "Send Unsubscribe Confirmation", "type": "main", "index": 0 }]] },
+    "Send Unsubscribe Confirmation": { "main": [[{ "node": "Respond OK (Unsubscribe)", "type": "main", "index": 0 }]] },
+    "Hourly Scheduler": { "main": [[{ "node": "Read All Subscriptions", "type": "main", "index": 0 }]] },
+    "Read All Subscriptions": { "main": [[{ "node": "Filter Due Subscriptions", "type": "main", "index": 0 }]] },
+    "Filter Due Subscriptions": { "main": [[{ "node": "Trigger Search for Subscriber", "type": "main", "index": 0 }]] },
+    "Trigger Search for Subscriber": { "main": [[{ "node": "Update lastSent Timestamp", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
