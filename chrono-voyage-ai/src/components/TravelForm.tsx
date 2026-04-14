@@ -3,10 +3,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface TravelFormProps {
-  onSubmit: (data: { query: string; email: string; name: string; priceTracking?: boolean; frequency?: string }) => void;
+  onSubmit: (data: {
+    query: string;
+    email: string;
+    name: string;
+    priceTracking?: boolean;
+    frequency?: string;
+    budgetMin?: number;
+    budgetMax?: number;
+  }) => void;
   isLoading: boolean;
   exampleQueries: Array<{ text: string; dates: string }>;
 }
+
+const BUDGET_PRESETS = [
+  { label: 'Under $200', min: 0, max: 200 },
+  { label: '$200–500', min: 200, max: 500 },
+  { label: '$500–1000', min: 500, max: 1000 },
+  { label: '$1000+', min: 1000, max: 99999 },
+];
 
 const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQueries }) => {
   const [formData, setFormData] = useState({
@@ -14,16 +29,24 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
     email: '',
     name: '',
     priceTracking: false,
-    frequency: 'weekly'
+    frequency: 'weekly',
+  });
+
+  const [budget, setBudget] = useState({
+    enabled: false,
+    selectedPreset: null as number | null,
+    customMin: '',
+    customMax: '',
+    useCustom: false,
   });
 
   const [errors, setErrors] = useState({
     query: '',
     email: '',
-    name: ''
+    name: '',
+    budget: '',
   });
 
-  // --- Unsubscribe modal state ---
   const [showUnsubscribe, setShowUnsubscribe] = useState(false);
   const [unsubEmail, setUnsubEmail] = useState('');
   const [unsubQuery, setUnsubQuery] = useState('');
@@ -33,7 +56,7 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
   const UNSUBSCRIBE_WEBHOOK = 'https://n8n.srv874091.hstgr.cloud/webhook/airbnb-unsubscribe';
 
   const validateForm = () => {
-    const newErrors = { query: '', email: '', name: '' };
+    const newErrors = { query: '', email: '', name: '', budget: '' };
     if (!formData.query.trim()) newErrors.query = 'Please describe your ideal Airbnb';
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
@@ -41,15 +64,41 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
       newErrors.email = 'Please enter a valid email address';
     }
     if (!formData.name.trim()) newErrors.name = 'Name is required';
+    if (budget.enabled && budget.useCustom) {
+      const min = Number(budget.customMin);
+      const max = Number(budget.customMax);
+      if (!budget.customMin || !budget.customMax) {
+        newErrors.budget = 'Please enter both min and max budget';
+      } else if (isNaN(min) || isNaN(max) || min < 0 || max < 0) {
+        newErrors.budget = 'Please enter valid numbers';
+      } else if (min >= max) {
+        newErrors.budget = 'Max budget must be greater than min';
+      }
+    } else if (budget.enabled && budget.selectedPreset === null) {
+      newErrors.budget = 'Please select a budget range';
+    }
     setErrors(newErrors);
     return !Object.values(newErrors).some(e => e !== '');
+  };
+
+  const getBudgetValues = () => {
+    if (!budget.enabled) return { budgetMin: undefined, budgetMax: undefined };
+    if (budget.useCustom) {
+      return { budgetMin: Number(budget.customMin), budgetMax: Number(budget.customMax) };
+    }
+    if (budget.selectedPreset !== null) {
+      return {
+        budgetMin: BUDGET_PRESETS[budget.selectedPreset].min,
+        budgetMax: BUDGET_PRESETS[budget.selectedPreset].max,
+      };
+    }
+    return { budgetMin: undefined, budgetMax: undefined };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-
-    // If price tracking enabled, call subscribe webhook separately
+    const { budgetMin, budgetMax } = getBudgetValues();
     if (formData.priceTracking) {
       try {
         const subUrl = new URL(SUBSCRIBE_WEBHOOK);
@@ -57,13 +106,14 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
         subUrl.searchParams.append('name', formData.name);
         subUrl.searchParams.append('query', formData.query);
         subUrl.searchParams.append('frequency', formData.frequency);
+        if (budgetMin !== undefined) subUrl.searchParams.append('budgetMin', String(budgetMin));
+        if (budgetMax !== undefined) subUrl.searchParams.append('budgetMax', String(budgetMax));
         await fetch(subUrl.toString(), { method: 'GET' });
       } catch (err) {
         console.warn('Subscribe webhook failed (non-blocking):', err);
       }
     }
-
-    onSubmit(formData);
+    onSubmit({ ...formData, budgetMin, budgetMax });
   };
 
   const handleInputChange = (field: string, value: any) => {
@@ -85,7 +135,6 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
     return () => window.removeEventListener('exampleSelected', handleExampleSelect as EventListener);
   }, []);
 
-  // --- Unsubscribe handler ---
   const handleUnsubscribe = async () => {
     if (!unsubEmail || !unsubQuery) return;
     setUnsubStatus('loading');
@@ -106,9 +155,22 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
     monthly: '🗓️ Monthly',
   };
 
+  const budgetSummary = () => {
+    if (!budget.enabled) return null;
+    if (budget.useCustom && budget.customMin && budget.customMax) {
+      return `$${budget.customMin} – $${budget.customMax} USD`;
+    }
+    if (budget.selectedPreset !== null) {
+      const p = BUDGET_PRESETS[budget.selectedPreset];
+      return p.max === 99999 ? `$${p.min}+ USD` : `$${p.min} – $${p.max} USD`;
+    }
+    return null;
+  };
+
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
+
         {/* Query */}
         <div>
           <label htmlFor="query" className="block text-sm font-medium text-gray-700 mb-2">
@@ -154,6 +216,119 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
             />
             {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
           </div>
+        </div>
+
+        {/* Budget Section */}
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div
+              onClick={() => !isLoading && setBudget(prev => ({ ...prev, enabled: !prev.enabled }))}
+              className={`w-10 h-6 rounded-full transition-colors duration-200 flex items-center px-1 cursor-pointer ${
+                budget.enabled ? 'bg-red-500' : 'bg-gray-300'
+              }`}
+            >
+              <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                budget.enabled ? 'translate-x-4' : 'translate-x-0'
+              }`} />
+            </div>
+            <div>
+              <span className="text-sm font-medium text-gray-800">💰 Set Budget (USD)</span>
+              <p className="text-xs text-gray-500 mt-0.5">Only show listings within your price range</p>
+            </div>
+          </label>
+
+          {budget.enabled && (
+            <div className="pt-2 border-t border-gray-200 space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-2">Quick select (total stay price)</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {BUDGET_PRESETS.map((preset, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={isLoading || budget.useCustom}
+                      onClick={() => {
+                        setBudget(prev => ({ ...prev, selectedPreset: i, useCustom: false }));
+                        setErrors(prev => ({ ...prev, budget: '' }));
+                      }}
+                      className={`py-2 px-1 rounded-lg text-xs font-medium transition-all border ${
+                        budget.selectedPreset === i && !budget.useCustom
+                          ? 'bg-red-500 text-white border-red-500 shadow-sm'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-red-300 hover:text-red-500'
+                      } disabled:opacity-40`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                  <input
+                    type="checkbox"
+                    checked={budget.useCustom}
+                    onChange={(e) => {
+                      setBudget(prev => ({
+                        ...prev,
+                        useCustom: e.target.checked,
+                        selectedPreset: e.target.checked ? null : prev.selectedPreset,
+                      }));
+                      setErrors(prev => ({ ...prev, budget: '' }));
+                    }}
+                    disabled={isLoading}
+                    className="w-3.5 h-3.5 accent-red-500"
+                  />
+                  <span className="text-xs text-gray-600">Enter custom range</span>
+                </label>
+
+                {budget.useCustom && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Min ($)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="e.g. 100"
+                        value={budget.customMin}
+                        onChange={(e) => {
+                          setBudget(prev => ({ ...prev, customMin: e.target.value }));
+                          setErrors(prev => ({ ...prev, budget: '' }));
+                        }}
+                        disabled={isLoading}
+                        className="w-full p-2.5 rounded-lg border border-gray-300 focus:border-red-400 focus:outline-none text-sm bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Max ($)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="e.g. 800"
+                        value={budget.customMax}
+                        onChange={(e) => {
+                          setBudget(prev => ({ ...prev, customMax: e.target.value }));
+                          setErrors(prev => ({ ...prev, budget: '' }));
+                        }}
+                        disabled={isLoading}
+                        className="w-full p-2.5 rounded-lg border border-gray-300 focus:border-red-400 focus:outline-none text-sm bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {budgetSummary() && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  <span className="text-xs text-red-600 font-medium">
+                    🎯 Budget set: {budgetSummary()}
+                  </span>
+                </div>
+              )}
+
+              {errors.budget && <p className="text-sm text-red-600">{errors.budget}</p>}
+            </div>
+          )}
         </div>
 
         {/* Price Tracking Section */}
@@ -202,7 +377,7 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
           )}
         </div>
 
-        {/* Submit Button */}
+        {/* Submit */}
         <Button
           type="submit"
           disabled={isLoading}
@@ -222,7 +397,6 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
           Your personalized Airbnb listings will be sent to your email within minutes
         </p>
 
-        {/* Unsubscribe Link */}
         <p className="text-xs text-center text-gray-400">
           Already subscribed?{' '}
           <button
@@ -276,11 +450,9 @@ const TravelForm: React.FC<TravelFormProps> = ({ onSubmit, isLoading, exampleQue
                     onChange={(e) => setUnsubQuery(e.target.value)}
                   />
                 </div>
-
                 {unsubStatus === 'error' && (
                   <p className="text-sm text-red-500">Something went wrong. Please try again.</p>
                 )}
-
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setShowUnsubscribe(false)}
